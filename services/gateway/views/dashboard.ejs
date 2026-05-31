@@ -1,0 +1,150 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Dashboard</span>
+    <h1>Tổng quan vận hành</h1>
+    <p>
+      Xin chào <b><%= user.fullName %></b>
+      - quyền <b><%= user.role %></b>
+      <% if (user.branchName) { %>
+        - <%= user.branchName %>
+      <% } %>
+    </p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<section class="grid cards">
+  <div class="card">
+    <h3>Chi nhánh</h3>
+    <b><%= branches ? branches.length : 0 %></b>
+    <small>Tổng số điểm bán</small>
+  </div>
+
+  <div class="card">
+    <h3>Khách hàng</h3>
+    <b><%= customers ? customers.length : 0 %></b>
+    <small>Khách hàng thân thiết</small>
+  </div>
+
+  <div class="card">
+    <h3>Order gần đây</h3>
+    <b><%= orders ? orders.length : 0 %></b>
+    <small>Đơn hàng mới nhất</small>
+  </div>
+
+  <div class="card">
+    <h3>Doanh thu ngày</h3>
+    <b>
+      <%= Number(
+        revenue?.byBranch?.[0]?.total_revenue ||
+        revenue?.system?.[0]?.total_revenue ||
+        0
+      ).toLocaleString('vi-VN') %>đ
+    </b>
+    <small>Đã ghi nhận</small>
+  </div>
+</section>
+
+<section class="two">
+  <div class="card">
+    <h2>Doanh thu theo chi nhánh</h2>
+
+    <% if (!revenue || !revenue.byBranch || revenue.byBranch.length === 0) { %>
+      <div class="empty-state">
+        <h2>Chưa có doanh thu</h2>
+        <p class="muted">Dữ liệu doanh thu theo chi nhánh sẽ hiển thị sau khi có đơn hàng thanh toán.</p>
+      </div>
+    <% } else { %>
+      <table>
+        <tr>
+          <th>Kỳ</th>
+          <th>Chi nhánh</th>
+          <th>Số đơn</th>
+          <th>Doanh thu</th>
+        </tr>
+
+        <% revenue.byBranch.forEach(r => { %>
+          <tr>
+            <td>
+              <%= new Date(r.period).toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh'
+              }) %>
+            </td>
+
+            <td><%= r.branch_name || '-' %></td>
+
+            <td><%= r.total_orders || 0 %></td>
+
+            <td>
+              <b><%= Number(r.total_revenue || 0).toLocaleString('vi-VN') %>đ</b>
+            </td>
+          </tr>
+        <% }) %>
+      </table>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <h2>Sản phẩm bán chạy</h2>
+
+    <% if (!revenue || !revenue.productShare || revenue.productShare.length === 0) { %>
+      <div class="empty-state">
+        <h2>Chưa có dữ liệu sản phẩm</h2>
+        <p class="muted">Sản phẩm bán chạy sẽ hiển thị sau khi có đơn hàng.</p>
+      </div>
+    <% } else { %>
+      <% const totalProductQty = revenue.productShare.reduce((s, x) => s + Number(x.quantity || 0), 0) || 1; %>
+
+      <% revenue.productShare.forEach(p => { %>
+        <% const w = Math.round(Number(p.quantity || 0) * 100 / totalProductQty); %>
+
+        <div class="barline">
+          <span><%= p.item_name || 'Không rõ' %></span>
+          <b class="barline-fill" data-width="<%= w %>"></b>
+          <em><%= w %>%</em>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</section>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  document.querySelectorAll('.barline-fill').forEach(bar => {
+    const width = Number(bar.dataset.width || 0);
+    bar.style.width = width + '%';
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

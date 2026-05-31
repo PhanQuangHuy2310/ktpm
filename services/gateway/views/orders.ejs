@@ -1,0 +1,219 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Orders</span>
+    <h1>
+      Lịch sử order
+      <% if (user.branchName) { %>
+        - <%= user.branchName %>
+      <% } %>
+    </h1>
+    <p>Lọc, xem chi tiết và xuất hóa đơn cho các đơn hàng đã phát sinh.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form method="get" class="form-inline card" id="filterOrderForm">
+  <label>Từ ngày</label>
+  <input
+    type="date"
+    name="from"
+    id="fromDate"
+    value="<%= query.from || '' %>"
+  >
+
+  <label>Đến ngày</label>
+  <input
+    type="date"
+    name="to"
+    id="toDate"
+    value="<%= query.to || '' %>"
+  >
+
+  <label>Hoặc tháng</label>
+  <input
+    type="month"
+    name="month"
+    id="monthFilter"
+    value="<%= query.month || '' %>"
+  >
+
+  <select name="status" id="statusFilter">
+    <option value="">Tất cả trạng thái</option>
+    <option value="PENDING" <%= query.status === 'PENDING' ? 'selected' : '' %>>PENDING</option>
+    <option value="PAID" <%= query.status === 'PAID' ? 'selected' : '' %>>PAID</option>
+    <option value="CANCELLED" <%= query.status === 'CANCELLED' ? 'selected' : '' %>>CANCELLED</option>
+  </select>
+
+  <button type="submit">Lọc</button>
+  <a class="btn light" href="/orders">Xóa lọc</a>
+</form>
+
+<% if (user.role === 'staff') { %>
+  <p>
+    <a class="btn" href="/orders/new">+ Bán hàng / tạo đơn tại chi nhánh</a>
+  </p>
+<% } %>
+
+<% if (!orders || orders.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Không có đơn hàng</h2>
+    <p class="muted">Không tìm thấy đơn hàng phù hợp với điều kiện lọc hiện tại.</p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Mã đơn</th>
+      <th>Chi nhánh</th>
+      <th>Khách</th>
+      <th>SĐT</th>
+      <th>Kênh</th>
+      <th>Trạng thái</th>
+      <th>Tạm tính</th>
+      <th>Giảm</th>
+      <th>Thanh toán</th>
+      <th>Thời gian</th>
+      <th>Hóa đơn</th>
+    </tr>
+
+    <% orders.forEach(o => { %>
+      <tr>
+        <td>
+          <a href="/orders/<%= o.id %>">#<%= o.id %></a>
+        </td>
+
+        <td><%= o.branch_name || '-' %></td>
+
+        <td><%= o.customer_name || 'Khách lẻ' %></td>
+
+        <td><%= o.customer_phone || '-' %></td>
+
+        <td>
+          <span class="pill"><%= o.channel || '-' %></span>
+        </td>
+
+        <td>
+          <span class="badge"><%= o.status || '-' %></span>
+        </td>
+
+        <td>
+          <%= Number(o.total_amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td>
+          <%= Number(o.discount_amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td>
+          <b><%= Number(o.final_amount || o.total_amount || 0).toLocaleString('vi-VN') %>đ</b>
+        </td>
+
+        <td>
+          <%= new Date(o.created_at).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour12: false
+          }) %>
+        </td>
+
+        <td>
+          <% if (o.status === 'PAID' || o.status === 'COMPLETED') { %>
+            <a class="btn light" href="/orders/<%= o.id %>/invoice">Xuất</a>
+          <% } else { %>
+            <span class="muted">Chưa thanh toán</span>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  const filterOrderForm = document.getElementById('filterOrderForm');
+
+  filterOrderForm.addEventListener('submit', function (e) {
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    const monthFilter = document.getElementById('monthFilter');
+    const statusFilter = document.getElementById('statusFilter');
+
+    [fromDate, toDate, monthFilter, statusFilter].forEach(function (input) {
+      input.classList.remove('input-error');
+    });
+
+    const from = fromDate.value;
+    const to = toDate.value;
+    const month = monthFilter.value;
+    const status = statusFilter.value;
+
+    if (month && (from || to)) {
+      e.preventDefault();
+      monthFilter.classList.add('input-error');
+      fromDate.classList.add('input-error');
+      toDate.classList.add('input-error');
+      showToast('Chỉ chọn lọc theo tháng hoặc lọc theo khoảng ngày, không chọn cả hai.', 'error');
+      return;
+    }
+
+    if ((from && !to) || (!from && to)) {
+      e.preventDefault();
+
+      if (!from) {
+        fromDate.classList.add('input-error');
+      }
+
+      if (!to) {
+        toDate.classList.add('input-error');
+      }
+
+      showToast('Vui lòng nhập đủ cả từ ngày và đến ngày.', 'error');
+      return;
+    }
+
+    if (from && to && new Date(from) > new Date(to)) {
+      e.preventDefault();
+      fromDate.classList.add('input-error');
+      toDate.classList.add('input-error');
+      showToast('Từ ngày không được lớn hơn đến ngày.', 'error');
+      return;
+    }
+
+    if (status && !['PENDING', 'PAID', 'CANCELLED'].includes(status)) {
+      e.preventDefault();
+      statusFilter.classList.add('input-error');
+      showToast('Trạng thái lọc không hợp lệ.', 'error');
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

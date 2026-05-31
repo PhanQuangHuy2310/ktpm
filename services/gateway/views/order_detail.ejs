@@ -1,0 +1,168 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Order detail</span>
+    <h1>Chi tiết đơn hàng #<%= order.id %></h1>
+    <p>Thông tin thanh toán, điểm tích lũy và danh sách sản phẩm trong đơn.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<div class="card">
+  <p>
+    <b>Chi nhánh:</b>
+    <%= order.branch_name || '-' %>
+  </p>
+
+  <p>
+    <b>Khách:</b>
+    <%= order.customer_name || 'Khách lẻ' %>
+    <%= order.customer_phone ? ' - ' + order.customer_phone : '' %>
+  </p>
+
+  <p>
+    <b>Địa chỉ nhận:</b>
+    <%= order.delivery_address || 'Không có' %>
+  </p>
+
+  <p>
+    <b>Thời gian tạo:</b>
+    <%= new Date(order.created_at).toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour12: false
+    }) %>
+  </p>
+
+  <p>
+    <b>Trạng thái:</b>
+    <span class="badge"><%= order.status %></span>
+  </p>
+
+  <p>
+    <b>Tạm tính:</b>
+    <%= Number(order.total_amount || 0).toLocaleString('vi-VN') %>đ
+  </p>
+
+  <p>
+    <b>Dùng điểm:</b>
+    <%= order.points_used || 0 %> điểm -
+    giảm <%= Number(order.discount_amount || 0).toLocaleString('vi-VN') %>đ
+  </p>
+
+  <p>
+    <b>Cần thanh toán:</b>
+    <b><%= Number(order.final_amount || order.total_amount || 0).toLocaleString('vi-VN') %>đ</b>
+  </p>
+
+  <p>
+    <b>Điểm sẽ cộng:</b>
+    <%= order.earned_points_if_paid || 0 %> điểm
+  </p>
+</div>
+
+<% if (order.items && order.items.length) { %>
+  <table>
+    <tr>
+      <th>Sản phẩm</th>
+      <th>SL</th>
+      <th>Đơn giá</th>
+      <th>Thành tiền</th>
+    </tr>
+
+    <% order.items.forEach(i => { %>
+      <tr>
+        <td><%= i.item_name %></td>
+        <td><span class="badge"><%= i.quantity %></span></td>
+        <td><%= Number(i.unit_price || 0).toLocaleString('vi-VN') %>đ</td>
+        <td><b><%= Number(i.line_total || 0).toLocaleString('vi-VN') %>đ</b></td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<% if (order.status !== 'PAID' && user.role === 'staff') { %>
+  <form
+    method="post"
+    action="/orders/<%= order.id %>/pay"
+    class="form-inline card"
+    id="payOrderForm"
+  >
+    <select name="method" id="paymentMethod" required>
+      <option value="">-- Chọn phương thức thanh toán --</option>
+      <option value="BANKING">BANKING</option>
+      <option value="MOMO">MOMO</option>
+      <option value="VNPAY">VNPAY</option>
+      <option value="CASH">CASH</option>
+      <option value="CARD">CARD</option>
+    </select>
+
+    <button type="submit">Xác nhận thanh toán & cộng điểm</button>
+  </form>
+<% } else if (order.status === 'PAID') { %>
+  <div class="success">
+    Đơn đã thanh toán thành công.
+    <a href="/orders/<%= order.id %>/invoice">Xuất hóa đơn</a>
+  </div>
+<% } else { %>
+  <div class="card">
+    <p class="muted">Bạn không có quyền xác nhận thanh toán đơn hàng này.</p>
+  </div>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  const payOrderForm = document.getElementById('payOrderForm');
+
+  if (payOrderForm) {
+    payOrderForm.addEventListener('submit', function (e) {
+      const paymentMethod = document.getElementById('paymentMethod');
+
+      paymentMethod.classList.remove('input-error');
+
+      if (!paymentMethod.value) {
+        e.preventDefault();
+        paymentMethod.classList.add('input-error');
+        showToast('Vui lòng chọn phương thức thanh toán.', 'error');
+        return;
+      }
+
+      const ok = confirm('Bạn chắc chắn muốn xác nhận thanh toán và cộng điểm cho đơn hàng này?');
+
+      if (!ok) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

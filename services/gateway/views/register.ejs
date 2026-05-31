@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng ký khách hàng</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-hero">
+      <div>
+        <span class="eyebrow">Customer account</span>
+
+        <h1>Tạo tài khoản khách hàng thân thiết.</h1>
+
+        <p>
+          Tích điểm sau mỗi đơn hàng, dùng điểm giảm giá và theo dõi lịch sử mua cà phê online.
+        </p>
+      </div>
+
+      <div class="stat-row">
+        <div>
+          <b>1 điểm</b>
+          <small>= 500đ</small>
+        </div>
+
+        <div>
+          <b>10k</b>
+          <small>= 1 điểm</small>
+        </div>
+
+        <div>
+          <b>RFM</b>
+          <small>Xét hạng</small>
+        </div>
+      </div>
+    </section>
+
+    <form class="login-card" method="post" id="registerForm">
+      <h1>Đăng ký khách hàng</h1>
+      <p>Điền thông tin để tạo tài khoản mua hàng.</p>
+
+      <div id="toast" class="toast hidden">
+        <span id="toastMessage"></span>
+        <button type="button" onclick="closeToast()">×</button>
+      </div>
+
+      <% if (error) { %>
+        <div class="alert"><%= error %></div>
+      <% } %>
+
+      <label>Tên đăng nhập</label>
+      <input
+        name="username"
+        id="username"
+        placeholder="Tên đăng nhập"
+        required
+      >
+
+      <label>Mật khẩu</label>
+      <input
+        name="password"
+        id="password"
+        type="password"
+        placeholder="Mật khẩu"
+        required
+      >
+
+      <label>Họ tên</label>
+      <input
+        name="name"
+        id="name"
+        placeholder="Họ tên"
+        required
+      >
+
+      <label>Số điện thoại</label>
+      <input
+        name="phone"
+        id="phone"
+        placeholder="Số điện thoại"
+        required
+      >
+
+      <label>Email</label>
+      <input
+        name="email"
+        id="email"
+        placeholder="Email"
+      >
+
+      <label>Địa chỉ mặc định</label>
+      <textarea
+        name="address"
+        id="address"
+        placeholder="Địa chỉ mặc định"
+      ></textarea>
+
+      <button type="submit">Tạo tài khoản</button>
+
+      <small>
+        <a href="/login">Quay lại đăng nhập</a>
+      </small>
+    </form>
+  </main>
+
+  <script>
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+
+    function showToast(message, type = 'success') {
+      toast.className = `toast ${type}`;
+      toastMessage.textContent = message;
+
+      setTimeout(function () {
+        closeToast();
+      }, 3500);
+    }
+
+    function closeToast() {
+      toast.className = 'toast hidden';
+    }
+
+    function validatePhone(phone) {
+      if (!phone) return false;
+
+      return /^(0|\+84)[0-9]{9,10}$/.test(phone);
+    }
+
+    function validateEmail(email) {
+      if (!email) return true;
+
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    const registerForm = document.getElementById('registerForm');
+
+    registerForm.addEventListener('submit', function (e) {
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const nameInput = document.getElementById('name');
+      const phoneInput = document.getElementById('phone');
+      const emailInput = document.getElementById('email');
+      const addressInput = document.getElementById('address');
+
+      [usernameInput, passwordInput, nameInput, phoneInput, emailInput, addressInput].forEach(function (input) {
+        input.classList.remove('input-error');
+      });
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const email = emailInput.value.trim();
+      const address = addressInput.value.trim();
+
+      if (username.length < 3) {
+        e.preventDefault();
+        usernameInput.classList.add('input-error');
+        showToast('Tên đăng nhập phải có ít nhất 3 ký tự.', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        e.preventDefault();
+        passwordInput.classList.add('input-error');
+        showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
+        return;
+      }
+
+      if (name.length < 2) {
+        e.preventDefault();
+        nameInput.classList.add('input-error');
+        showToast('Họ tên phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (!validatePhone(phone)) {
+        e.preventDefault();
+        phoneInput.classList.add('input-error');
+        showToast('Số điện thoại không hợp lệ. Ví dụ: 0987654321 hoặc +84987654321.', 'error');
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        e.preventDefault();
+        emailInput.classList.add('input-error');
+        showToast('Email không hợp lệ.', 'error');
+        return;
+      }
+
+      if (address && address.length < 5) {
+        e.preventDefault();
+        addressInput.classList.add('input-error');
+        showToast('Địa chỉ phải có ít nhất 5 ký tự hoặc bỏ trống.', 'error');
+      }
+    });
+
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('success')) {
+      showToast(params.get('success'), 'success');
+    }
+
+    if (params.get('error')) {
+      showToast(params.get('error'), 'error');
+    }
+  </script>
+</body>
+</html>

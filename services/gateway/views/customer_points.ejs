@@ -1,0 +1,168 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Loyalty</span>
+    <h1>Điểm khách hàng</h1>
+    <p>Xem điểm tích lũy, giá trị quy đổi và thông tin xét hạng RFM.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<div class="card point-big">
+  <h2><%= customer.name %></h2>
+
+  <p>
+    Điểm hiện có:
+    <b><%= customer.points || 0 %></b>
+  </p>
+
+  <p>
+    Giá trị quy đổi:
+    <b><%= Number((customer.points || 0) * 500).toLocaleString('vi-VN') %>đ</b>
+  </p>
+
+  <p>
+    Hạng hiện tại:
+    <span class="badge"><%= customer.tier || 'MEMBER' %></span>
+  </p>
+
+  <% if (customer.last_rank_evaluated_at) { %>
+    <p>
+      RFM tháng 05/2026:
+      R=<b><%= customer.r_score || 0 %></b>,
+      F=<b><%= customer.f_score || 0 %></b>,
+      M=<b><%= customer.m_score || 0 %></b>,
+      score=<b><%= customer.rfm_score || 0 %></b>,
+      hạng RFM=<b><%= customer.rfm_rank || 'Chưa có' %></b>
+    </p>
+
+    <p>
+      Tổng chi 6 tháng:
+      <b><%= Number(customer.spending_6m || 0).toLocaleString('vi-VN') %>đ</b>,
+      hạng chi tiêu:
+      <b><%= customer.spending_rank || 'Chưa có' %></b>
+    </p>
+
+    <p>
+      Lần xét hạng gần nhất:
+      <%= new Date(customer.last_rank_evaluated_at).toLocaleString('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        hour12: false
+      }) %>
+    </p>
+  <% } else { %>
+    <p class="muted">Khách hàng chưa được xét hạng theo RFM.</p>
+  <% } %>
+
+  <p>
+    Quy đổi: <b>1 điểm = 500đ</b> giảm giá.
+    Tích điểm: <b>10.000đ thanh toán = 1 điểm</b>.
+    Hạng khách hàng được xét riêng bằng RFM, không tính trực tiếp từ điểm tích lũy.
+  </p>
+</div>
+
+<h2>Lịch sử điểm/giao dịch</h2>
+
+<% if (!history || history.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Chưa có lịch sử điểm</h2>
+    <p class="muted">
+      Sau khi thanh toán đơn hàng, lịch sử cộng điểm hoặc dùng điểm sẽ hiển thị tại đây.
+    </p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Thời gian</th>
+      <th>Chi nhánh</th>
+      <th>Đơn</th>
+      <th>Giá trị</th>
+      <th>Cộng</th>
+      <th>Dùng</th>
+      <th>Giảm</th>
+      <th>Mô tả</th>
+    </tr>
+
+    <% history.forEach(h => { %>
+      <tr>
+        <td>
+          <%= new Date(h.purchase_date).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour12: false
+          }) %>
+        </td>
+
+        <td><%= h.branch_name || '-' %></td>
+
+        <td>
+          <% if (h.order_id) { %>
+            <a href="/orders/<%= h.order_id %>">#<%= h.order_id %></a>
+          <% } else { %>
+            <span class="muted">-</span>
+          <% } %>
+        </td>
+
+        <td>
+          <%= Number(h.amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td>
+          <% if (Number(h.points_added || 0) > 0) { %>
+            <span class="badge">+<%= h.points_added %></span>
+          <% } else { %>
+            <span class="muted">0</span>
+          <% } %>
+        </td>
+
+        <td>
+          <% if (Number(h.points_used || 0) > 0) { %>
+            <span class="badge">-<%= h.points_used %></span>
+          <% } else { %>
+            <span class="muted">0</span>
+          <% } %>
+        </td>
+
+        <td>
+          <%= Number(h.discount_amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td><%= h.description || '-' %></td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

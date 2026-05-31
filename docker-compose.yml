@@ -1,0 +1,83 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/gateway
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - branch-service
+      - menu-service
+      - order-service
+      - loyalty-service
+      - report-service
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/auth-service
+    env_file: .env
+    depends_on:
+      - redis
+
+  branch-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/branch-service
+    env_file: .env
+    depends_on:
+      - redis
+
+  menu-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/menu-service
+    env_file: .env
+    depends_on:
+      - redis
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/order-service
+    env_file: .env
+    depends_on:
+      - redis
+
+  loyalty-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/loyalty-service
+    env_file: .env
+    depends_on:
+      - redis
+
+  report-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: services/report-service
+    env_file: .env
+    depends_on:
+      - redis

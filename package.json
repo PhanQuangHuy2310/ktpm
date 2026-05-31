@@ -1,0 +1,13 @@
+{
+  "name": "coffee-chain-mvc-microservices",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["services/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w services/gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/branch-service\" \"npm run dev -w services/menu-service\" \"npm run dev -w services/order-service\" \"npm run dev -w services/loyalty-service\" \"npm run dev -w services/report-service\"",
+    "start": "docker compose up --build",
+    "stop": "docker compose down",
+    "load:test": "node tests/load-test.js"
+  },
+  "devDependencies": {"concurrently":"^9.1.0","autocannon":"^8.0.0"}
+}

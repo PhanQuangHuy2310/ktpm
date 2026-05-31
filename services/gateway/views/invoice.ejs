@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hóa đơn</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body class="invoice-body">
+  <main class="invoice">
+    <h1>HÓA ĐƠN THANH TOÁN</h1>
+
+    <p class="center">
+      <b><%= order.branch_name %></b><br>
+      <%= order.branch_address || '' %>
+    </p>
+
+    <hr>
+
+    <div class="invoice-meta">
+      <span>
+        Ngày:
+        <%= new Date(order.paid_at || order.created_at).toLocaleDateString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh'
+        }) %>
+      </span>
+
+      <span>
+        Giờ:
+        <%= new Date(order.paid_at || order.created_at).toLocaleTimeString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          hour12: false
+        }) %>
+      </span>
+    </div>
+
+    <p><b>Khách hàng:</b> <%= order.customer_name || 'Khách lẻ' %></p>
+    <p><b>Số điện thoại:</b> <%= order.customer_phone || '' %></p>
+    <p><b>Email:</b> <%= order.customer_email || '' %></p>
+    <p><b>Địa chỉ giao hàng:</b> <%= order.delivery_address || '' %></p>
+
+    <table class="receipt-table">
+      <tr>
+        <th>Tên hàng</th>
+        <th>SL</th>
+        <th>Đ.Giá</th>
+        <th>T.Tiền</th>
+      </tr>
+
+      <% order.items.forEach(i => { %>
+        <tr>
+          <td><%= i.item_name %></td>
+          <td><%= i.quantity %></td>
+          <td><%= Number(i.unit_price).toLocaleString('vi-VN') %>đ</td>
+          <td><%= Number(i.line_total).toLocaleString('vi-VN') %>đ</td>
+        </tr>
+      <% }) %>
+    </table>
+
+    <p class="right">
+      Tạm cộng:
+      <b><%= Number(order.total_amount).toLocaleString('vi-VN') %>đ</b>
+    </p>
+
+    <p class="right">
+      Giảm điểm:
+      <b><%= Number(order.discount_amount || 0).toLocaleString('vi-VN') %>đ</b>
+    </p>
+
+    <h2 class="right">
+      Thanh toán:
+      <%= Number(order.final_amount || order.total_amount).toLocaleString('vi-VN') %>đ
+    </h2>
+
+    <p class="center words">Cảm ơn quý khách và hẹn gặp lại!</p>
+
+    <div class="no-print actions">
+      <button type="button" onclick="window.print()">In / Lưu PDF</button>
+      <a class="btn" href="/customer/orders">Quay lại</a>
+    </div>
+  </main>
+</body>
+</html>

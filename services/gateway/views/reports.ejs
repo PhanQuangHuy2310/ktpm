@@ -1,0 +1,346 @@
+<%- include('partials/header') %>
+
+<%
+  const selectedPeriod = typeof period !== 'undefined' ? period : 'day';
+  const selectedBranchId = typeof branch_id !== 'undefined' ? branch_id : '';
+  const selectedChannel = typeof channel !== 'undefined' ? channel : 'ALL';
+  const selectedFrom = typeof from !== 'undefined' ? from : '';
+  const selectedTo = typeof to !== 'undefined' ? to : '';
+%>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Revenue analytics</span>
+    <h1>Báo cáo doanh thu</h1>
+    <p>Theo dõi doanh thu theo kỳ, chi nhánh, kênh bán POS/Online/Delivery và tỷ trọng sản phẩm được mua.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form method="get" action="/reports" class="form-inline card" id="revenueFilterForm">
+  <select name="period" id="periodFilter" required>
+    <option value="day" <%= selectedPeriod === 'day' ? 'selected' : '' %>>Ngày</option>
+    <option value="week" <%= selectedPeriod === 'week' ? 'selected' : '' %>>Tuần</option>
+    <option value="month" <%= selectedPeriod === 'month' ? 'selected' : '' %>>Tháng</option>
+  </select>
+
+  <% if (user.role === 'admin') { %>
+    <select name="branch_id" id="branchFilter">
+      <option value="" <%= !selectedBranchId ? 'selected' : '' %>>Toàn hệ thống</option>
+
+      <% branches.forEach(b => { %>
+        <option value="<%= b.id %>" <%= Number(selectedBranchId) === Number(b.id) ? 'selected' : '' %>>
+          <%= b.name %>
+        </option>
+      <% }) %>
+    </select>
+  <% } else { %>
+    <span class="badge"><%= user.branchName %></span>
+  <% } %>
+
+  <select name="channel" id="channelFilter">
+    <option value="ALL" <%= selectedChannel === 'ALL' ? 'selected' : '' %>>Tất cả kênh</option>
+    <option value="POS" <%= selectedChannel === 'POS' ? 'selected' : '' %>>POS tại quầy</option>
+    <option value="ONLINE" <%= selectedChannel === 'ONLINE' ? 'selected' : '' %>>Online</option>
+    <option value="DELIVERY" <%= selectedChannel === 'DELIVERY' ? 'selected' : '' %>>Delivery</option>
+  </select>
+
+  <input
+    type="date"
+    name="from"
+    id="fromFilter"
+    value="<%= selectedFrom %>"
+    title="Từ ngày"
+  >
+
+  <input
+    type="date"
+    name="to"
+    id="toFilter"
+    value="<%= selectedTo %>"
+    title="Đến ngày"
+  >
+
+  <button type="submit">Xem báo cáo</button>
+
+  <a class="btn-light" href="/reports">Xóa lọc</a>
+</form>
+
+<section class="grid cards">
+  <div class="card">
+    <h3>Tổng chi nhánh</h3>
+    <b><%= revenue && revenue.totals ? revenue.totals.branches || 0 : 0 %></b>
+  </div>
+
+  <div class="card">
+    <h3>Tổng order đã thanh toán</h3>
+    <b><%= revenue && revenue.totals ? revenue.totals.orders || 0 : 0 %></b>
+  </div>
+
+  <div class="card">
+    <h3>Tổng doanh thu thực thu</h3>
+    <b>
+      <%= Number(
+        revenue && revenue.totals ? revenue.totals.revenue || 0 : 0
+      ).toLocaleString('vi-VN') %>đ
+    </b>
+  </div>
+
+  <div class="card">
+    <h3>Tổng giảm giá</h3>
+    <b>
+      <%= Number(
+        revenue && revenue.totals ? revenue.totals.discount || 0 : 0
+      ).toLocaleString('vi-VN') %>đ
+    </b>
+  </div>
+</section>
+
+<section class="two">
+  <div class="card">
+    <h2>Biểu đồ cột doanh thu 14 ngày gần nhất</h2>
+
+    <% if (!revenue || !revenue.chartRows || revenue.chartRows.length === 0) { %>
+      <div class="empty-state">
+        <h2>Chưa có dữ liệu doanh thu</h2>
+        <p class="muted">Biểu đồ sẽ hiển thị sau khi có đơn hàng đã thanh toán đúng bộ lọc.</p>
+      </div>
+    <% } else { %>
+      <div class="chart-bars">
+        <% const maxRevenue = Math.max(...revenue.chartRows.map(r => Number(r.revenue || 0)), 1); %>
+
+        <% revenue.chartRows.forEach(r => { %>
+          <% const barHeight = Math.max(8, Number(r.revenue || 0) * 180 / maxRevenue); %>
+
+          <div class="bar-col">
+            <span class="revenue-bar" data-height="<%= barHeight %>"></span>
+
+            <small>
+              <%= new Date(r.label).toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                day: '2-digit',
+                month: '2-digit'
+              }) %>
+            </small>
+
+            <b><%= Number(r.revenue || 0).toLocaleString('vi-VN') %></b>
+            <em><%= r.total_orders || 0 %> đơn</em>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <h2>Donut % sản phẩm được mua</h2>
+
+    <% if (!revenue || !revenue.productShare || revenue.productShare.length === 0) { %>
+      <div class="empty-state">
+        <h2>Chưa có dữ liệu sản phẩm</h2>
+        <p class="muted">Tỷ trọng sản phẩm sẽ hiển thị sau khi phát sinh đơn hàng phù hợp bộ lọc.</p>
+      </div>
+    <% } else { %>
+      <div class="donut-list">
+        <% const totalQty = revenue.productShare.reduce((s, x) => s + Number(x.quantity || 0), 0) || 1; %>
+
+        <% revenue.productShare.forEach((p, idx) => { %>
+          <% const percent = Math.round(Number(p.quantity || 0) * 100 / totalQty); %>
+
+          <div class="donut-row">
+            <span class="dot"></span>
+            <b><%= p.item_name || 'Không rõ' %></b>
+            <em><%= percent %>%</em>
+            <small>
+              <%= p.quantity || 0 %> món ·
+              <%= Number(p.revenue || 0).toLocaleString('vi-VN') %>đ
+            </small>
+          </div>
+        <% }) %>
+      </div>
+
+      <div class="donut">
+        <%
+          let acc = 0;
+          const colors = [
+            '#6f4327',
+            '#b07745',
+            '#d9a66d',
+            '#8a5a36',
+            '#c7773b',
+            '#e6c7a4',
+            '#4c2f1d',
+            '#a26332'
+          ];
+
+          const stops = revenue.productShare.map((p, i) => {
+            const pct = Number(p.quantity || 0) * 100 / totalQty;
+            const s = `${colors[i % colors.length]} ${acc}% ${acc + pct}%`;
+            acc += pct;
+            return s;
+          }).join(',');
+        %>
+
+        <div
+          class="donut-chart"
+          data-gradient="<%= stops || '#ddd 0 100%' %>"
+        ></div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Cơ cấu kênh bán</h2>
+
+  <% if (!revenue || !revenue.channelShare || revenue.channelShare.length === 0) { %>
+    <div class="empty-state">
+      <h2>Chưa có dữ liệu kênh bán</h2>
+      <p class="muted">Dữ liệu kênh bán sẽ xuất hiện sau khi có đơn đã thanh toán.</p>
+    </div>
+  <% } else { %>
+    <table>
+      <tr>
+        <th>Kênh bán</th>
+        <th>Số đơn</th>
+        <th>Doanh thu</th>
+      </tr>
+
+      <% revenue.channelShare.forEach(c => { %>
+        <tr>
+          <td><b><%= c.channel || '-' %></b></td>
+          <td><%= c.total_orders || 0 %></td>
+          <td><%= Number(c.revenue || 0).toLocaleString('vi-VN') %>đ</td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</section>
+
+<h2>Chi tiết doanh thu</h2>
+
+<% if (!revenue || !revenue.byBranch || revenue.byBranch.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Không có dữ liệu chi tiết</h2>
+    <p class="muted">Không tìm thấy doanh thu phù hợp với bộ lọc hiện tại.</p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Kỳ</th>
+      <th>Chi nhánh</th>
+      <th>Số đơn</th>
+      <th>Doanh thu thực thu</th>
+    </tr>
+
+    <% revenue.byBranch.forEach(r => { %>
+      <tr>
+        <td>
+          <%= new Date(r.period).toLocaleDateString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh'
+          }) %>
+        </td>
+
+        <td><%= r.branch_name || '-' %></td>
+
+        <td><%= r.total_orders || 0 %></td>
+
+        <td>
+          <b><%= Number(r.total_revenue || 0).toLocaleString('vi-VN') %>đ</b>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  const revenueFilterForm = document.getElementById('revenueFilterForm');
+
+  if (revenueFilterForm) {
+    revenueFilterForm.addEventListener('submit', function (e) {
+      const periodFilter = document.getElementById('periodFilter');
+      const branchFilter = document.getElementById('branchFilter');
+      const channelFilter = document.getElementById('channelFilter');
+      const fromFilter = document.getElementById('fromFilter');
+      const toFilter = document.getElementById('toFilter');
+
+      [periodFilter, branchFilter, channelFilter, fromFilter, toFilter].forEach(function (el) {
+        if (el) el.classList.remove('input-error');
+      });
+
+      const period = periodFilter.value;
+      const channel = channelFilter.value;
+      const from = fromFilter.value;
+      const to = toFilter.value;
+
+      if (!['day', 'week', 'month'].includes(period)) {
+        e.preventDefault();
+        periodFilter.classList.add('input-error');
+        showToast('Kỳ báo cáo không hợp lệ.', 'error');
+        return;
+      }
+
+      if (branchFilter && branchFilter.value && Number(branchFilter.value) <= 0) {
+        e.preventDefault();
+        branchFilter.classList.add('input-error');
+        showToast('Chi nhánh không hợp lệ.', 'error');
+        return;
+      }
+
+      if (!['ALL', 'POS', 'ONLINE', 'DELIVERY'].includes(channel)) {
+        e.preventDefault();
+        channelFilter.classList.add('input-error');
+        showToast('Kênh bán hàng không hợp lệ.', 'error');
+        return;
+      }
+
+      if (from && to && new Date(from) > new Date(to)) {
+        e.preventDefault();
+        fromFilter.classList.add('input-error');
+        toFilter.classList.add('input-error');
+        showToast('Ngày bắt đầu không được lớn hơn ngày kết thúc.', 'error');
+      }
+    });
+  }
+
+  document.querySelectorAll('.revenue-bar').forEach(function (bar) {
+    const height = Number(bar.dataset.height || 8);
+    bar.style.height = height + 'px';
+  });
+
+  document.querySelectorAll('.donut-chart').forEach(function (chart) {
+    const gradient = chart.dataset.gradient || '#ddd 0 100%';
+    chart.style.background = 'conic-gradient(' + gradient + ')';
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

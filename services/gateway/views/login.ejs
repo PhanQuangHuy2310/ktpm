@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng nhập</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-hero">
+      <div>
+        <span class="eyebrow">Coffee management</span>
+
+        <h1>Vận hành chuỗi cà phê tinh gọn hơn.</h1>
+
+        <p>
+          Đăng nhập để quản lý chi nhánh, order, khách hàng thân thiết,
+          doanh thu và RFM trong cùng một hệ thống.
+        </p>
+      </div>
+
+      <div class="stat-row">
+        <div>
+          <b>POS</b>
+          <small>Bán hàng</small>
+        </div>
+
+        <div>
+          <b>RFM</b>
+          <small>Xếp hạng</small>
+        </div>
+
+        <div>
+          <b>BI</b>
+          <small>Báo cáo</small>
+        </div>
+      </div>
+    </section>
+
+    <form class="login-card" method="post" id="loginForm">
+      <h1>☕ Coffee Chain</h1>
+      <p>Đăng nhập hệ thống</p>
+
+      <% if (error) { %>
+        <div class="alert"><%= error %></div>
+      <% } %>
+
+      <label>Tài khoản</label>
+      <input
+        name="username"
+        id="username"
+        placeholder="admin / manager_hn / khách"
+        required
+      >
+
+      <label>Mật khẩu</label>
+      <input
+        name="password"
+        id="password"
+        type="password"
+        value="1234567"
+        required
+      >
+
+      <button type="submit">Đăng nhập</button>
+
+      <small>
+        Khách chưa có tài khoản?
+        <a href="/register">Đăng ký tại đây</a>
+      </small>
+    </form>
+  </main>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+
+    loginForm.addEventListener('submit', function (e) {
+      const username = document.getElementById('username');
+      const password = document.getElementById('password');
+
+      username.classList.remove('input-error');
+      password.classList.remove('input-error');
+
+      if (!username.value.trim()) {
+        e.preventDefault();
+        username.classList.add('input-error');
+        alert('Vui lòng nhập tài khoản.');
+        return;
+      }
+
+      if (!password.value.trim()) {
+        e.preventDefault();
+        password.classList.add('input-error');
+        alert('Vui lòng nhập mật khẩu.');
+        return;
+      }
+
+      if (password.value.trim().length < 6) {
+        e.preventDefault();
+        password.classList.add('input-error');
+        alert('Mật khẩu phải có ít nhất 6 ký tự.');
+      }
+    });
+  </script>
+</body>
+</html>

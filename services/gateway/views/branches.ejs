@@ -1,0 +1,181 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Branches</span>
+    <h1>Quản lý tất cả chi nhánh</h1>
+    <p>Thêm, cập nhật thông tin và trạng thái hoạt động của từng chi nhánh.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form class="form-inline card validate-form" method="post" action="/branches">
+  <input name="name" placeholder="Tên chi nhánh" required>
+  <input name="address" placeholder="Địa chỉ" required>
+  <input name="phone" placeholder="Điện thoại">
+  <button type="submit">+ Thêm chi nhánh</button>
+</form>
+
+<table>
+  <tr>
+    <th>Tên</th>
+    <th>Địa chỉ</th>
+    <th>SĐT</th>
+    <th>Nhân viên</th>
+    <th>Trạng thái</th>
+    <th>Thao tác</th>
+  </tr>
+
+  <% branches.forEach(b => { %>
+    <tr>
+      <td>
+        <input
+          form="update-<%= b.id %>"
+          name="name"
+          value="<%= b.name %>"
+          required
+        >
+      </td>
+
+      <td>
+        <input
+          form="update-<%= b.id %>"
+          name="address"
+          value="<%= b.address %>"
+          required
+        >
+      </td>
+
+      <td>
+        <input
+          form="update-<%= b.id %>"
+          name="phone"
+          value="<%= b.phone || '' %>"
+        >
+      </td>
+
+      <td>
+        <span class="badge"><%= b.staff_count %> người</span>
+      </td>
+
+      <td>
+        <select form="update-<%= b.id %>" name="status">
+          <option value="ACTIVE" <%= b.status === 'ACTIVE' ? 'selected' : '' %>>ACTIVE</option>
+          <option value="INACTIVE" <%= b.status === 'INACTIVE' ? 'selected' : '' %>>INACTIVE</option>
+        </select>
+      </td>
+
+      <td class="actions-cell">
+        <form
+          id="update-<%= b.id %>"
+          class="validate-form"
+          method="post"
+          action="/branches/<%= b.id %>/update"
+        >
+          <button type="submit">Lưu</button>
+        </form>
+
+        <form
+          method="post"
+          action="/branches/<%= b.id %>/delete"
+          onsubmit="return confirmHideBranch()"
+        >
+          <button type="submit" class="danger">Ẩn</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+</table>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function validatePhone(phone) {
+    if (!phone) return true;
+
+    const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
+    return phoneRegex.test(phone);
+  }
+
+  function getFormInput(form, name) {
+    const inputInForm = form.querySelector(`[name="${name}"]`);
+
+    if (inputInForm) {
+      return inputInForm;
+    }
+
+    return document.querySelector(`[form="${form.id}"][name="${name}"]`);
+  }
+
+  document.querySelectorAll('.validate-form').forEach(form => {
+    form.addEventListener('submit', function (e) {
+      const nameInput = getFormInput(form, 'name');
+      const addressInput = getFormInput(form, 'address');
+      const phoneInput = getFormInput(form, 'phone');
+
+      let isValid = true;
+
+      [nameInput, addressInput, phoneInput].forEach(input => {
+        if (input) {
+          input.classList.remove('input-error');
+        }
+      });
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const address = addressInput ? addressInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+
+      if (name.length < 2) {
+        isValid = false;
+        nameInput.classList.add('input-error');
+        showToast('Tên chi nhánh phải có ít nhất 2 ký tự.', 'error');
+      } else if (address.length < 5) {
+        isValid = false;
+        addressInput.classList.add('input-error');
+        showToast('Địa chỉ phải có ít nhất 5 ký tự.', 'error');
+      } else if (!validatePhone(phone)) {
+        isValid = false;
+        phoneInput.classList.add('input-error');
+        showToast('Số điện thoại không hợp lệ. Ví dụ: 0987654321 hoặc +84987654321.', 'error');
+      }
+
+      if (!isValid) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  function confirmHideBranch() {
+    return confirm('Bạn có chắc muốn ẩn chi nhánh này không?');
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,306 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">POS</span>
+    <h1>Tạo đơn tại quầy/chi nhánh</h1>
+    <p>Chọn khách hàng, áp dụng điểm giảm giá và thêm món vào đơn bán hàng.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form method="get" class="form-inline card">
+  <label>Chi nhánh</label>
+
+  <select name="branch_id" onchange="this.form.submit()">
+    <% branches.forEach(b => { %>
+      <option value="<%= b.id %>" <%= Number(branchId) === b.id ? 'selected' : '' %>>
+        <%= b.name %>
+      </option>
+    <% }) %>
+  </select>
+</form>
+
+<form method="post" action="/orders" class="card" id="posOrderForm">
+  <input type="hidden" name="branch_id" value="<%= branchId %>">
+
+  <section class="two">
+    <div>
+      <label>Khách hàng</label>
+
+      <select name="customer_id" id="customerSelect">
+        <option value="" data-points="0">Khách lẻ</option>
+
+        <% customers.forEach(c => { %>
+          <option value="<%= c.id %>" data-points="<%= c.points || 0 %>">
+            #<%= c.id %> - <%= c.name %> - <%= c.points || 0 %> điểm
+          </option>
+        <% }) %>
+      </select>
+
+      <label>Dùng điểm giảm giá</label>
+
+      <input
+        type="number"
+        name="use_points"
+        id="usePoints"
+        min="0"
+        value="0"
+      >
+
+      <small>
+        1 điểm = 500đ. Hệ thống tự trừ điểm và lưu lịch sử.
+      </small>
+
+      <label>Địa chỉ nhận hàng</label>
+
+      <input
+        name="delivery_address"
+        id="deliveryAddress"
+        placeholder="Nhập địa chỉ nếu giao hàng"
+      >
+
+      <label>Kênh bán</label>
+
+      <select name="channel" id="channelSelect" required>
+        <option value="POS">POS</option>
+        <option value="WEB">WEB</option>
+        <option value="MOBILE">MOBILE</option>
+      </select>
+
+      <textarea name="note" placeholder="Ghi chú"></textarea>
+
+      <button class="primary" type="submit">Tạo đơn</button>
+    </div>
+
+    <div>
+      <h2>Chọn món</h2>
+
+      <% if (!branchMenu || branchMenu.length === 0) { %>
+        <div class="empty-state">
+          <h2>Chưa có món</h2>
+          <p class="muted">Chi nhánh này chưa có sản phẩm đang bán.</p>
+        </div>
+      <% } else { %>
+        <div class="products">
+          <% branchMenu.forEach(m => { %>
+            <label class="product-mini">
+              <img src="<%= m.image_url || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' %>">
+
+              <span>
+                <b><%= m.name %></b><br>
+                <span data-price="<%= m.price %>">
+                  <%= Number(m.price || 0).toLocaleString('vi-VN') %>đ
+                </span>
+              </span>
+
+              <input
+                type="checkbox"
+                class="choose"
+                name="menu_item_id"
+                value="<%= m.menu_item_id %>"
+              >
+
+              <input
+                type="number"
+                class="qty"
+                name="quantity_<%= m.menu_item_id %>"
+                value="1"
+                min="1"
+              >
+            </label>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</form>
+
+<aside class="card cart-card">
+  <h2>Tóm tắt đơn</h2>
+
+  <div id="cartItems" class="muted">Chưa chọn sản phẩm</div>
+
+  <hr>
+
+  <p>Tạm tính: <b id="subtotal">0đ</b></p>
+  <p>Dùng điểm: <b id="pointDiscount">0đ</b></p>
+  <p>Cần thanh toán: <b id="finalTotal">0đ</b></p>
+  <p class="muted">Sau khi tạo đơn, nhân viên vào chi tiết đơn để xác nhận thanh toán.</p>
+</aside>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function money(value) {
+    return Number(value || 0).toLocaleString('vi-VN') + 'đ';
+  }
+
+  function getCustomerPoints() {
+    const customerSelect = document.getElementById('customerSelect');
+    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+
+    return Number(selectedOption.dataset.points || 0);
+  }
+
+  function getSelectedItems() {
+    const items = [];
+
+    document.querySelectorAll('.product-mini').forEach(function (row) {
+      const checkbox = row.querySelector('.choose');
+      const quantityInput = row.querySelector('.qty');
+      const priceElement = row.querySelector('[data-price]');
+      const nameElement = row.querySelector('b');
+
+      if (checkbox && checkbox.checked) {
+        const quantity = Number(quantityInput.value || 1);
+        const price = Number(priceElement.dataset.price || 0);
+        const name = nameElement.textContent.trim();
+
+        items.push({
+          name,
+          quantity,
+          price,
+          quantityInput
+        });
+      }
+    });
+
+    return items;
+  }
+
+  function calcTotal() {
+    const selectedItems = getSelectedItems();
+
+    let subtotal = 0;
+    const itemTexts = [];
+
+    selectedItems.forEach(function (item) {
+      subtotal += item.price * item.quantity;
+      itemTexts.push(item.name + ' x ' + item.quantity);
+    });
+
+    const usePointsInput = document.getElementById('usePoints');
+    const usePoints = Number(usePointsInput.value || 0);
+    const pointDiscount = usePoints * 500;
+    const finalTotal = Math.max(0, subtotal - pointDiscount);
+
+    document.getElementById('cartItems').innerHTML = itemTexts.length
+      ? itemTexts.map(function (text) {
+          return '<div>' + text + '</div>';
+        }).join('')
+      : 'Chưa chọn sản phẩm';
+
+    document.getElementById('subtotal').textContent = money(subtotal);
+    document.getElementById('pointDiscount').textContent = money(pointDiscount);
+    document.getElementById('finalTotal').textContent = money(finalTotal);
+  }
+
+  document.querySelectorAll('.choose, .qty, #usePoints, #customerSelect').forEach(function (input) {
+    input.addEventListener('input', calcTotal);
+    input.addEventListener('change', calcTotal);
+  });
+
+  const posOrderForm = document.getElementById('posOrderForm');
+
+  posOrderForm.addEventListener('submit', function (e) {
+    const customerSelect = document.getElementById('customerSelect');
+    const usePointsInput = document.getElementById('usePoints');
+    const deliveryAddressInput = document.getElementById('deliveryAddress');
+    const channelSelect = document.getElementById('channelSelect');
+
+    document.querySelectorAll('.input-error').forEach(function (input) {
+      input.classList.remove('input-error');
+    });
+
+    const selectedItems = getSelectedItems();
+    const customerId = customerSelect.value;
+    const customerPoints = getCustomerPoints();
+    const usePoints = Number(usePointsInput.value || 0);
+    const deliveryAddress = deliveryAddressInput.value.trim();
+    const channel = channelSelect.value;
+
+    if (selectedItems.length === 0) {
+      e.preventDefault();
+      showToast('Vui lòng chọn ít nhất 1 món để tạo đơn.', 'error');
+      return;
+    }
+
+    for (const item of selectedItems) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        e.preventDefault();
+        item.quantityInput.classList.add('input-error');
+        showToast('Số lượng món phải lớn hơn 0.', 'error');
+        return;
+      }
+    }
+
+    if (usePoints < 0) {
+      e.preventDefault();
+      usePointsInput.classList.add('input-error');
+      showToast('Số điểm sử dụng không được nhỏ hơn 0.', 'error');
+      return;
+    }
+
+    if (!customerId && usePoints > 0) {
+      e.preventDefault();
+      customerSelect.classList.add('input-error');
+      usePointsInput.classList.add('input-error');
+      showToast('Khách lẻ không thể dùng điểm giảm giá.', 'error');
+      return;
+    }
+
+    if (usePoints > customerPoints) {
+      e.preventDefault();
+      usePointsInput.classList.add('input-error');
+      showToast('Khách hàng không đủ điểm để sử dụng.', 'error');
+      return;
+    }
+
+    if (deliveryAddress && deliveryAddress.length < 5) {
+      e.preventDefault();
+      deliveryAddressInput.classList.add('input-error');
+      showToast('Địa chỉ nhận hàng phải có ít nhất 5 ký tự hoặc bỏ trống.', 'error');
+      return;
+    }
+
+    if (!['POS', 'WEB', 'MOBILE'].includes(channel)) {
+      e.preventDefault();
+      channelSelect.classList.add('input-error');
+      showToast('Kênh bán không hợp lệ.', 'error');
+      return;
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+
+  calcTotal();
+</script>
+
+<%- include('partials/footer') %>

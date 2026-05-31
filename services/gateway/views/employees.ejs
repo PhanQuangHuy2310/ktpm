@@ -1,0 +1,282 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Staff</span>
+    <h1>
+      Quản lý nhân viên
+      <% if (user.branchName) { %>
+        - <%= user.branchName %>
+      <% } %>
+    </h1>
+    <p>Theo dõi hồ sơ, vị trí và trạng thái làm việc của nhân sự cửa hàng.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form class="form-inline card validate-employee-form" method="post" id="addEmployeeForm">
+  <% if (user.role === 'admin') { %>
+    <select name="branch_id" required>
+      <option value="">-- Chọn chi nhánh --</option>
+
+      <% branches.forEach(b => { %>
+        <option value="<%= b.id %>"><%= b.name %></option>
+      <% }) %>
+    </select>
+  <% } %>
+
+  <input name="name" placeholder="Họ tên" required>
+
+  <input name="email" placeholder="Email">
+
+  <input name="phone" placeholder="Số điện thoại">
+
+  <select name="position" required>
+    <option value="">-- Chọn vị trí --</option>
+    <option value="Bồi bàn">Bồi bàn</option>
+    <option value="Pha chế">Pha chế</option>
+    <option value="Vệ sinh">Vệ sinh</option>
+    <option value="Thu ngân">Thu ngân</option>
+    <option value="Bảo vệ">Bảo vệ</option>
+  </select>
+
+  <button type="submit">+ Thêm nhân viên</button>
+</form>
+
+<% if (!employees || employees.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Chưa có nhân viên</h2>
+    <p class="muted">Danh sách nhân viên sẽ hiển thị sau khi có dữ liệu.</p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Chi nhánh</th>
+      <th>Họ tên</th>
+      <th>Email</th>
+      <th>SĐT</th>
+      <th>Vị trí</th>
+      <th>Trạng thái</th>
+      <th>Thao tác</th>
+    </tr>
+
+    <% employees.forEach(e => { %>
+      <tr>
+        <td>
+          <% if (user.role === 'admin') { %>
+            <select form="update-employee-<%= e.id %>" name="branch_id" required>
+              <% branches.forEach(b => { %>
+                <option
+                  value="<%= b.id %>"
+                  <%= Number(e.branch_id) === b.id ? 'selected' : '' %>
+                >
+                  <%= b.name %>
+                </option>
+              <% }) %>
+            </select>
+          <% } else { %>
+            <%= e.branch_name || '-' %>
+          <% } %>
+        </td>
+
+        <td>
+          <input
+            form="update-employee-<%= e.id %>"
+            name="name"
+            value="<%= e.name %>"
+            required
+          >
+        </td>
+
+        <td>
+          <input
+            form="update-employee-<%= e.id %>"
+            name="email"
+            value="<%= e.email || '' %>"
+          >
+        </td>
+
+        <td>
+          <input
+            form="update-employee-<%= e.id %>"
+            name="phone"
+            value="<%= e.phone || '' %>"
+          >
+        </td>
+
+        <td>
+          <select form="update-employee-<%= e.id %>" name="position" required>
+            <% ['Bồi bàn', 'Pha chế', 'Vệ sinh', 'Thu ngân', 'Bảo vệ'].forEach(p => { %>
+              <option value="<%= p %>" <%= e.position === p ? 'selected' : '' %>>
+                <%= p %>
+              </option>
+            <% }) %>
+          </select>
+        </td>
+
+        <td>
+          <select form="update-employee-<%= e.id %>" name="status" required>
+            <option value="ACTIVE" <%= e.status === 'ACTIVE' ? 'selected' : '' %>>ACTIVE</option>
+            <option value="INACTIVE" <%= e.status === 'INACTIVE' ? 'selected' : '' %>>INACTIVE</option>
+          </select>
+        </td>
+
+        <td class="actions-cell">
+          <form
+            id="update-employee-<%= e.id %>"
+            class="validate-employee-form"
+            method="post"
+            action="/employees/<%= e.id %>/update"
+          >
+            <button type="submit">Lưu</button>
+          </form>
+
+          <form
+            method="post"
+            action="/employees/<%= e.id %>/delete"
+            class="confirm-form"
+            data-confirm="Bạn chắc chắn muốn xóa nhân viên này?"
+          >
+            <button type="submit" class="danger">Xóa</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function validatePhone(phone) {
+    if (!phone) return true;
+
+    return /^(0|\+84)[0-9]{9,10}$/.test(phone);
+  }
+
+  function validateEmail(email) {
+    if (!email) return true;
+
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  function getFormInput(form, name) {
+    const inputInForm = form.querySelector(`[name="${name}"]`);
+
+    if (inputInForm) {
+      return inputInForm;
+    }
+
+    return document.querySelector(`[form="${form.id}"][name="${name}"]`);
+  }
+
+  document.querySelectorAll('.validate-employee-form').forEach(form => {
+    form.addEventListener('submit', function (e) {
+      const branchInput = getFormInput(form, 'branch_id');
+      const nameInput = getFormInput(form, 'name');
+      const emailInput = getFormInput(form, 'email');
+      const phoneInput = getFormInput(form, 'phone');
+      const positionInput = getFormInput(form, 'position');
+      const statusInput = getFormInput(form, 'status');
+
+      [branchInput, nameInput, emailInput, phoneInput, positionInput, statusInput].forEach(input => {
+        if (input) input.classList.remove('input-error');
+      });
+
+      const branchId = branchInput ? branchInput.value.trim() : '';
+      const name = nameInput ? nameInput.value.trim() : '';
+      const email = emailInput ? emailInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      const position = positionInput ? positionInput.value.trim() : '';
+      const status = statusInput ? statusInput.value.trim() : '';
+
+      if (branchInput && !branchId) {
+        e.preventDefault();
+        branchInput.classList.add('input-error');
+        showToast('Vui lòng chọn chi nhánh.', 'error');
+        return;
+      }
+
+      if (!name || name.length < 2) {
+        e.preventDefault();
+        nameInput.classList.add('input-error');
+        showToast('Họ tên nhân viên phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (name.length > 120) {
+        e.preventDefault();
+        nameInput.classList.add('input-error');
+        showToast('Họ tên nhân viên không được vượt quá 120 ký tự.', 'error');
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        e.preventDefault();
+        emailInput.classList.add('input-error');
+        showToast('Email không hợp lệ.', 'error');
+        return;
+      }
+
+      if (!validatePhone(phone)) {
+        e.preventDefault();
+        phoneInput.classList.add('input-error');
+        showToast('Số điện thoại không hợp lệ. Ví dụ: 0987654321 hoặc +84987654321.', 'error');
+        return;
+      }
+
+      if (!position) {
+        e.preventDefault();
+        positionInput.classList.add('input-error');
+        showToast('Vui lòng chọn vị trí nhân viên.', 'error');
+        return;
+      }
+
+      if (statusInput && !['ACTIVE', 'INACTIVE'].includes(status)) {
+        e.preventDefault();
+        statusInput.classList.add('input-error');
+        showToast('Trạng thái nhân viên không hợp lệ.', 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('.confirm-form').forEach(form => {
+    form.addEventListener('submit', function (e) {
+      const message = form.dataset.confirm || 'Bạn chắc chắn muốn thực hiện thao tác này?';
+
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

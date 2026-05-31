@@ -1,0 +1,448 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Customers & RFM</span>
+    <h1>Khách hàng thân thiết</h1>
+    <p>Quản lý khách hàng, tra cứu điểm, lịch sử giao dịch và xét hạng RFM tự động.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<% if (typeof rankMessage !== "undefined" && rankMessage) { %>
+  <div class="success"><%= rankMessage %></div>
+<% } %>
+
+<% if (typeof pointMessage !== "undefined" && pointMessage) { %>
+  <div class="success"><%= pointMessage %></div>
+<% } %>
+
+<% if (['admin', 'manager'].includes(user.role)) { %>
+  <section class="two">
+    <form
+      method="post"
+      action="/customers/evaluate-ranks"
+      class="card form-inline confirm-form"
+      data-confirm="Bạn chắc chắn muốn xét hạng RFM cho tất cả khách hàng?"
+    >
+      <div>
+        <h2>Xét hạng tự động theo RFM</h2>
+        <small>
+          RFM tháng 05/2026, chốt ngày 31/05/2026.
+          Tổng chi tiêu duy trì hạng tính từ 01/12/2025 đến 31/05/2026.
+        </small>
+      </div>
+
+      <button type="submit">Xét hạng tất cả khách</button>
+    </form>
+
+    <form
+      method="post"
+      action="/customers/deduct-half-cycle"
+      class="card form-inline confirm-form"
+      data-confirm="Bạn chắc chắn muốn trừ 50% điểm của tất cả khách hàng trong phạm vi quản lý?"
+    >
+      <div>
+        <h2>Trừ điểm định kỳ</h2>
+        <small>
+          Khi hết chu kỳ, bấm thủ công để trừ 50% điểm hiện có của tất cả khách hàng.
+        </small>
+      </div>
+
+      <button type="submit" class="danger">Trừ 50% điểm tất cả khách</button>
+    </form>
+  </section>
+<% } %>
+
+<section class="two">
+  <form method="post" class="card" id="addCustomerForm">
+    <h2>Thêm khách tại quầy</h2>
+
+    <input name="username" placeholder="Username, bỏ trống sẽ dùng SĐT">
+
+    <input
+      name="password"
+      value="1234567"
+      placeholder="Mật khẩu"
+      required
+    >
+
+    <input
+      name="name"
+      placeholder="Tên khách"
+      required
+    >
+
+    <input
+      name="phone"
+      placeholder="SĐT"
+      required
+    >
+
+    <input
+      name="email"
+      placeholder="Email"
+    >
+
+    <textarea name="address" placeholder="Địa chỉ"></textarea>
+
+    <button type="submit">Thêm khách</button>
+  </form>
+
+  <div class="card">
+    <form method="get" action="/customers/lookup" id="lookupForm">
+      <h2>Tra cứu khách hàng</h2>
+
+      <input
+        name="q"
+        id="lookupInput"
+        value="<%= search || '' %>"
+        placeholder="Nhập tên, email hoặc số điện thoại"
+        required
+      >
+
+      <button type="submit">Tra cứu</button>
+    </form>
+
+    <% if (lookup) { %>
+      <div class="success lookup-result">
+        <b><%= lookup.name %></b><br>
+
+        SĐT: <%= lookup.phone %><br>
+        Email: <%= lookup.email || '-' %><br>
+
+        Điểm hiện có:
+        <b><%= lookup.points || 0 %></b>
+        =
+        <b><%= Number((lookup.points || 0) * 500).toLocaleString('vi-VN') %>đ</b><br>
+
+        Hạng hiện tại:
+        <span class="badge"><%= lookup.tier || 'MEMBER' %></span><br>
+
+        <% if (lookup.last_rank_evaluated_at) { %>
+          RFM:
+          R=<%= lookup.r_score || 0 %>,
+          F=<%= lookup.f_score || 0 %>,
+          M=<%= lookup.m_score || 0 %>,
+          điểm=<%= lookup.rfm_score || 0 %>,
+          hạng RFM=<%= lookup.rfm_rank || '-' %><br>
+
+          Tổng chi 6 tháng:
+          <%= Number(lookup.spending_6m || 0).toLocaleString('vi-VN') %>đ,
+          hạng chi tiêu=<%= lookup.spending_rank || '-' %><br>
+
+          Lần xét gần nhất:
+          <%= new Date(lookup.last_rank_evaluated_at).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour12: false
+          }) %>
+        <% } else { %>
+          Chưa xét hạng RFM.
+        <% } %>
+
+        <% if (['admin', 'manager'].includes(user.role)) { %>
+          <hr>
+
+          <form
+            method="post"
+            action="/customers/<%= lookup.id %>/deduct-points"
+            class="form-inline confirm-form"
+            data-confirm="Bạn chắc chắn muốn trừ 50% điểm của khách này?"
+          >
+            <input type="hidden" name="mode" value="HALF_CYCLE">
+            <input type="hidden" name="reason" value="Trừ 50% điểm khi hết chu kỳ">
+            <input type="hidden" name="q" value="<%= search || lookup.phone %>">
+
+            <button type="submit" class="danger">Trừ 50% điểm khách này</button>
+          </form>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<% if (history && lookup) { %>
+  <h2>Lịch sử giao dịch của <%= lookup.name %></h2>
+
+  <% if (history.length === 0) { %>
+    <div class="card empty-state">
+      <h2>Chưa có lịch sử giao dịch</h2>
+      <p class="muted">Khách hàng này chưa phát sinh giao dịch điểm nào.</p>
+    </div>
+  <% } else { %>
+    <table>
+      <tr>
+        <th>Thời gian</th>
+        <th>Chi nhánh</th>
+        <th>Đơn</th>
+        <th>Giá trị</th>
+        <th>Cộng</th>
+        <th>Dùng</th>
+        <th>Giảm giá</th>
+        <th>Mô tả</th>
+      </tr>
+
+      <% history.forEach(h => { %>
+        <tr>
+          <td>
+            <%= new Date(h.purchase_date).toLocaleString('vi-VN', {
+              timeZone: 'Asia/Ho_Chi_Minh',
+              hour12: false
+            }) %>
+          </td>
+
+          <td><%= h.branch_name || '-' %></td>
+
+          <td>
+            <% if (h.order_id) { %>
+              <a href="/orders/<%= h.order_id %>">#<%= h.order_id %></a>
+            <% } else { %>
+              <span class="muted">-</span>
+            <% } %>
+          </td>
+
+          <td><%= Number(h.amount || 0).toLocaleString('vi-VN') %>đ</td>
+
+          <td>
+            <% if (Number(h.points_added || 0) > 0) { %>
+              <span class="badge">+<%= h.points_added %></span>
+            <% } else { %>
+              <span class="muted">0</span>
+            <% } %>
+          </td>
+
+          <td>
+            <% if (Number(h.points_used || 0) > 0) { %>
+              <span class="badge">-<%= h.points_used %></span>
+            <% } else { %>
+              <span class="muted">0</span>
+            <% } %>
+          </td>
+
+          <td><%= Number(h.discount_amount || 0).toLocaleString('vi-VN') %>đ</td>
+          <td><%= h.description || '-' %></td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+<% } %>
+
+<h2>
+  Danh sách khách hàng
+
+  <% if (user.role !== 'admin' && user.branchName) { %>
+    tại <%= user.branchName %>
+  <% } %>
+</h2>
+
+<% if (!customers || customers.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Chưa có khách hàng</h2>
+    <p class="muted">Danh sách khách hàng sẽ hiển thị sau khi có dữ liệu.</p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Tên</th>
+      <th>SĐT</th>
+      <th>Email</th>
+      <th>Điểm</th>
+      <th>Hạng hiện tại</th>
+      <th>R</th>
+      <th>F</th>
+      <th>M</th>
+      <th>RFM score</th>
+      <th>RFM rank</th>
+      <th>Chi 6 tháng</th>
+      <th>Spending rank</th>
+      <th>Thao tác</th>
+    </tr>
+
+    <% customers.forEach(c => { %>
+      <tr>
+        <td><b><%= c.name %></b></td>
+        <td><%= c.phone %></td>
+        <td><%= c.email || '-' %></td>
+
+        <td>
+          <b><%= c.points || 0 %></b><br>
+          <small><%= Number((c.points || 0) * 500).toLocaleString('vi-VN') %>đ</small>
+        </td>
+
+        <td>
+          <span class="badge"><%= c.tier || 'MEMBER' %></span><br>
+          <small><%= c.rank_assigned ? 'Đã xét RFM' : 'Chưa xét RFM' %></small>
+        </td>
+
+        <td><%= c.r_score ?? '-' %></td>
+        <td><%= c.f_score ?? '-' %></td>
+        <td><%= c.m_score ?? '-' %></td>
+        <td><%= c.rfm_score ?? '-' %></td>
+        <td><%= c.rfm_rank || '-' %></td>
+        <td><%= Number(c.spending_6m || 0).toLocaleString('vi-VN') %>đ</td>
+        <td><%= c.spending_rank || '-' %></td>
+
+        <td class="actions-cell">
+          <a href="/customers/lookup?q=<%= encodeURIComponent(c.phone) %>">Xem</a>
+
+          <% if (['admin', 'manager'].includes(user.role)) { %>
+            <form
+              method="post"
+              action="/customers/evaluate-ranks"
+              class="confirm-form"
+              data-confirm="Bạn chắc chắn muốn xét hạng khách hàng này?"
+            >
+              <input type="hidden" name="customer_id" value="<%= c.id %>">
+              <button type="submit">Xét hạng</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function validatePhone(phone) {
+    if (!phone) return false;
+
+    return /^(0|\+84)[0-9]{9,10}$/.test(phone);
+  }
+
+  function validateEmail(email) {
+    if (!email) return true;
+
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  const addCustomerForm = document.getElementById('addCustomerForm');
+
+  if (addCustomerForm) {
+    addCustomerForm.addEventListener('submit', function (e) {
+      const usernameInput = addCustomerForm.querySelector('[name="username"]');
+      const passwordInput = addCustomerForm.querySelector('[name="password"]');
+      const nameInput = addCustomerForm.querySelector('[name="name"]');
+      const phoneInput = addCustomerForm.querySelector('[name="phone"]');
+      const emailInput = addCustomerForm.querySelector('[name="email"]');
+      const addressInput = addCustomerForm.querySelector('[name="address"]');
+
+      [usernameInput, passwordInput, nameInput, phoneInput, emailInput, addressInput].forEach(input => {
+        if (input) input.classList.remove('input-error');
+      });
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const email = emailInput.value.trim();
+      const address = addressInput.value.trim();
+
+      if (username && username.length < 3) {
+        e.preventDefault();
+        usernameInput.classList.add('input-error');
+        showToast('Username phải có ít nhất 3 ký tự hoặc bỏ trống để dùng SĐT.', 'error');
+        return;
+      }
+
+      if (!password || password.length < 6) {
+        e.preventDefault();
+        passwordInput.classList.add('input-error');
+        showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
+        return;
+      }
+
+      if (!name || name.length < 2) {
+        e.preventDefault();
+        nameInput.classList.add('input-error');
+        showToast('Tên khách hàng phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (!validatePhone(phone)) {
+        e.preventDefault();
+        phoneInput.classList.add('input-error');
+        showToast('Số điện thoại không hợp lệ. Ví dụ: 0987654321 hoặc +84987654321.', 'error');
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        e.preventDefault();
+        emailInput.classList.add('input-error');
+        showToast('Email không hợp lệ.', 'error');
+        return;
+      }
+
+      if (address && address.length < 5) {
+        e.preventDefault();
+        addressInput.classList.add('input-error');
+        showToast('Địa chỉ phải có ít nhất 5 ký tự hoặc bỏ trống.', 'error');
+      }
+    });
+  }
+
+  const lookupForm = document.getElementById('lookupForm');
+
+  if (lookupForm) {
+    lookupForm.addEventListener('submit', function (e) {
+      const lookupInput = document.getElementById('lookupInput');
+      const q = lookupInput.value.trim();
+
+      lookupInput.classList.remove('input-error');
+
+      if (!q) {
+        e.preventDefault();
+        lookupInput.classList.add('input-error');
+        showToast('Vui lòng nhập tên, email hoặc số điện thoại để tra cứu.', 'error');
+        return;
+      }
+
+      if (q.length < 2) {
+        e.preventDefault();
+        lookupInput.classList.add('input-error');
+        showToast('Từ khóa tra cứu phải có ít nhất 2 ký tự.', 'error');
+      }
+    });
+  }
+
+  document.querySelectorAll('.confirm-form').forEach(form => {
+    form.addEventListener('submit', function (e) {
+      const message = form.dataset.confirm || 'Bạn chắc chắn muốn thực hiện thao tác này?';
+
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

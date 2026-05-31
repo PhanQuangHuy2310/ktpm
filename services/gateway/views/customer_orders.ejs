@@ -1,0 +1,106 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">My orders</span>
+    <h1>Hàng đã mua</h1>
+    <p>Theo dõi lịch sử đơn hàng và xuất hóa đơn khi cần.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<% if (!orders || orders.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Chưa có đơn hàng nào</h2>
+    <p class="muted">Bạn chưa mua sản phẩm nào. Hãy đặt cà phê để bắt đầu tích điểm.</p>
+    <a class="btn" href="/customer/shop">Đặt cà phê ngay</a>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>Mã đơn</th>
+      <th>Chi nhánh</th>
+      <th>Trạng thái</th>
+      <th>Tạm tính</th>
+      <th>Giảm</th>
+      <th>Thanh toán</th>
+      <th>Ngày mua</th>
+      <th>Hóa đơn</th>
+    </tr>
+
+    <% orders.forEach(o => { %>
+      <tr>
+        <td>
+          <a href="/orders/<%= o.id %>">#<%= o.id %></a>
+        </td>
+
+        <td><%= o.branch_name || 'Không rõ' %></td>
+
+        <td>
+          <span class="badge"><%= o.status %></span>
+        </td>
+
+        <td>
+          <%= Number(o.total_amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td>
+          <%= Number(o.discount_amount || 0).toLocaleString('vi-VN') %>đ
+        </td>
+
+        <td>
+          <b><%= Number(o.final_amount || o.total_amount || 0).toLocaleString('vi-VN') %>đ</b>
+        </td>
+
+        <td>
+          <%= new Date(o.paid_at || o.created_at).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour12: false
+          }) %>
+        </td>
+
+        <td>
+          <% if (o.status === 'PAID' || o.status === 'COMPLETED') { %>
+            <a class="btn light" href="/orders/<%= o.id %>/invoice">Xuất</a>
+          <% } else { %>
+            <span class="muted">Chưa thanh toán</span>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

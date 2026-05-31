@@ -1,0 +1,458 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Menu & Pricing</span>
+    <h1>
+      Quản lý menu và giá
+      <% if (user.branchName) { %>
+        - <%= user.branchName %>
+      <% } %>
+    </h1>
+    <p>Cập nhật sản phẩm, giá bán theo chi nhánh và tình trạng còn bán.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<section class="card menu-tabs-card">
+  <div class="menu-tabs">
+    <button type="button" class="tab-btn active" data-tab="branch-menu">
+      Menu chi nhánh
+    </button>
+
+    <button type="button" class="tab-btn" data-tab="system-menu">
+      Kho món hệ thống
+    </button>
+  </div>
+</section>
+
+<section id="branch-menu" class="tab-panel active">
+  <% if (user.role === 'admin') { %>
+    <form method="get" class="form-inline card">
+      <label>Chọn chi nhánh</label>
+
+      <select name="branch_id" onchange="this.form.submit()">
+        <% branches.forEach(b => { %>
+          <option value="<%= b.id %>" <%= Number(branchId) === b.id ? 'selected' : '' %>>
+            <%= b.name %>
+          </option>
+        <% }) %>
+      </select>
+    </form>
+  <% } %>
+
+  <section class="card">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Branch Menu</span>
+        <h2>Menu đang bán tại chi nhánh</h2>
+        <p>Quản lý giá bán, trạng thái còn bán và ghi chú riêng của từng chi nhánh.</p>
+      </div>
+    </div>
+
+    <table>
+      <tr>
+        <th>Ảnh</th>
+        <th>Món</th>
+        <th>Danh mục</th>
+        <th>Giá</th>
+        <th>Còn bán</th>
+        <th>Ghi chú</th>
+        <th>Thao tác</th>
+      </tr>
+
+      <% if (branchMenu && branchMenu.length) { %>
+        <% branchMenu.forEach(m => { %>
+          <tr>
+            <td>
+              <img
+                class="thumb"
+                src="<%= m.image_url || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' %>"
+              >
+            </td>
+
+            <td><b><%= m.name %></b></td>
+
+            <td>
+              <span class="pill"><%= m.category %></span>
+            </td>
+
+            <td>
+              <input
+                form="update-branch-menu-<%= m.id %>"
+                name="price"
+                type="number"
+                min="1000"
+                step="1000"
+                value="<%= m.price %>"
+                required
+              >
+            </td>
+
+            <td>
+              <select form="update-branch-menu-<%= m.id %>" name="is_available" required>
+                <option value="true" <%= m.is_available ? 'selected' : '' %>>Có</option>
+                <option value="false" <%= !m.is_available ? 'selected' : '' %>>Không</option>
+              </select>
+            </td>
+
+            <td>
+              <input
+                form="update-branch-menu-<%= m.id %>"
+                name="local_note"
+                value="<%= m.local_note || '' %>"
+                placeholder="Ghi chú"
+              >
+            </td>
+
+            <td class="actions-cell">
+              <form
+                id="update-branch-menu-<%= m.id %>"
+                method="post"
+                action="/branch-menus/<%= m.id %>/update"
+                class="validate-branch-menu-form"
+              >
+                <button type="submit">Lưu</button>
+              </form>
+
+              <form
+                method="post"
+                action="/branch-menus/<%= m.id %>/delete"
+                class="confirm-form"
+                data-confirm="Bạn chắc chắn muốn xóa món này khỏi chi nhánh?"
+              >
+                <button type="submit" class="danger">Xóa khỏi CN</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="7" class="empty-cell">
+            Chi nhánh này chưa có món nào được gán giá bán.
+          </td>
+        </tr>
+      <% } %>
+    </table>
+  </section>
+</section>
+
+<section id="system-menu" class="tab-panel">
+  <section class="two">
+    <div class="card">
+      <h2>Thêm sản phẩm</h2>
+
+      <form method="post" action="/menu-items" id="addMenuItemForm">
+        <input name="name" placeholder="Tên sản phẩm" required>
+
+        <input name="category" placeholder="Danh mục" required>
+
+        <input
+          name="base_price"
+          type="number"
+          min="1000"
+          step="1000"
+          placeholder="Giá gốc"
+          required
+        >
+
+        <input name="image_url" placeholder="URL ảnh sản phẩm">
+
+        <textarea name="description" placeholder="Mô tả"></textarea>
+
+        <button type="submit">Thêm sản phẩm</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Gán món cho chi nhánh</h2>
+
+      <form method="post" action="/branch-menus" id="assignBranchMenuForm">
+        <% if (user.role === 'admin') { %>
+          <select name="branch_id" required>
+            <option value="">-- Chọn chi nhánh --</option>
+
+            <% branches.forEach(b => { %>
+              <option value="<%= b.id %>" <%= Number(branchId) === b.id ? 'selected' : '' %>>
+                <%= b.name %>
+              </option>
+            <% }) %>
+          </select>
+        <% } else { %>
+          <input type="hidden" name="branch_id" value="<%= branchId %>">
+          <p class="badge"><%= user.branchName %></p>
+        <% } %>
+
+        <select name="menu_item_id" required>
+          <option value="">-- Chọn món --</option>
+
+          <% items.forEach(i => { %>
+            <option value="<%= i.id %>">
+              <%= i.name %> - <%= i.category %>
+            </option>
+          <% }) %>
+        </select>
+
+        <input
+          name="price"
+          type="number"
+          min="1000"
+          step="1000"
+          placeholder="Giá tại chi nhánh"
+          required
+        >
+
+        <input name="local_note" placeholder="Ghi chú">
+
+        <button type="submit">Lưu giá</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">System Menu</span>
+        <h2>Danh sách món có trong hệ thống</h2>
+        <p>Đây là danh sách sản phẩm gốc. Muốn bán ở chi nhánh nào thì gán giá cho chi nhánh đó.</p>
+      </div>
+    </div>
+
+    <table>
+      <tr>
+        <th>Ảnh</th>
+        <th>Món</th>
+        <th>Danh mục</th>
+        <th>Giá gốc</th>
+        <th>Mô tả</th>
+      </tr>
+
+      <% if (items && items.length) { %>
+        <% items.forEach(i => { %>
+          <tr>
+            <td>
+              <img
+                class="thumb"
+                src="<%= i.image_url || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' %>"
+              >
+            </td>
+
+            <td><b><%= i.name %></b></td>
+
+            <td>
+              <span class="pill"><%= i.category %></span>
+            </td>
+
+            <td>
+              <b><%= Number(i.base_price || 0).toLocaleString('vi-VN') %>đ</b>
+            </td>
+
+            <td><%= i.description || 'Chưa có mô tả' %></td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="5" class="empty-cell">
+            Chưa có sản phẩm nào trong hệ thống.
+          </td>
+        </tr>
+      <% } %>
+    </table>
+  </section>
+</section>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function validatePrice(value) {
+    const price = Number(value);
+    return Number.isFinite(price) && price >= 1000;
+  }
+
+  function validateUrl(url) {
+    if (!url) return true;
+
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearErrors(form) {
+    form.querySelectorAll('input, select, textarea').forEach(function (input) {
+      input.classList.remove('input-error');
+    });
+
+    document.querySelectorAll('[form="' + form.id + '"]').forEach(function (input) {
+      input.classList.remove('input-error');
+    });
+  }
+
+  function getFormInput(form, name) {
+    const inputInForm = form.querySelector('[name="' + name + '"]');
+
+    if (inputInForm) {
+      return inputInForm;
+    }
+
+    return document.querySelector('[form="' + form.id + '"][name="' + name + '"]');
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const tabId = btn.dataset.tab;
+
+      document.querySelectorAll('.tab-btn').forEach(function (item) {
+        item.classList.remove('active');
+      });
+
+      document.querySelectorAll('.tab-panel').forEach(function (panel) {
+        panel.classList.remove('active');
+      });
+
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
+  const addMenuItemForm = document.getElementById('addMenuItemForm');
+
+  if (addMenuItemForm) {
+    addMenuItemForm.addEventListener('submit', function (e) {
+      clearErrors(addMenuItemForm);
+
+      const nameInput = addMenuItemForm.querySelector('[name="name"]');
+      const categoryInput = addMenuItemForm.querySelector('[name="category"]');
+      const basePriceInput = addMenuItemForm.querySelector('[name="base_price"]');
+      const imageUrlInput = addMenuItemForm.querySelector('[name="image_url"]');
+
+      const name = nameInput.value.trim();
+      const category = categoryInput.value.trim();
+      const basePrice = basePriceInput.value.trim();
+      const imageUrl = imageUrlInput.value.trim();
+
+      if (name.length < 2) {
+        e.preventDefault();
+        nameInput.classList.add('input-error');
+        showToast('Tên sản phẩm phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (category.length < 2) {
+        e.preventDefault();
+        categoryInput.classList.add('input-error');
+        showToast('Danh mục phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (!validatePrice(basePrice)) {
+        e.preventDefault();
+        basePriceInput.classList.add('input-error');
+        showToast('Giá gốc phải từ 1.000đ trở lên.', 'error');
+        return;
+      }
+
+      if (!validateUrl(imageUrl)) {
+        e.preventDefault();
+        imageUrlInput.classList.add('input-error');
+        showToast('URL ảnh không hợp lệ.', 'error');
+      }
+    });
+  }
+
+  const assignBranchMenuForm = document.getElementById('assignBranchMenuForm');
+
+  if (assignBranchMenuForm) {
+    assignBranchMenuForm.addEventListener('submit', function (e) {
+      clearErrors(assignBranchMenuForm);
+
+      const branchInput = assignBranchMenuForm.querySelector('[name="branch_id"]');
+      const itemInput = assignBranchMenuForm.querySelector('[name="menu_item_id"]');
+      const priceInput = assignBranchMenuForm.querySelector('[name="price"]');
+
+      if (branchInput && !branchInput.value) {
+        e.preventDefault();
+        branchInput.classList.add('input-error');
+        showToast('Vui lòng chọn chi nhánh.', 'error');
+        return;
+      }
+
+      if (!itemInput.value) {
+        e.preventDefault();
+        itemInput.classList.add('input-error');
+        showToast('Vui lòng chọn món cần gán cho chi nhánh.', 'error');
+        return;
+      }
+
+      if (!validatePrice(priceInput.value)) {
+        e.preventDefault();
+        priceInput.classList.add('input-error');
+        showToast('Giá bán tại chi nhánh phải từ 1.000đ trở lên.', 'error');
+      }
+    });
+  }
+
+  document.querySelectorAll('.validate-branch-menu-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      clearErrors(form);
+
+      const priceInput = getFormInput(form, 'price');
+      const availableInput = getFormInput(form, 'is_available');
+
+      if (!validatePrice(priceInput.value)) {
+        e.preventDefault();
+        priceInput.classList.add('input-error');
+        showToast('Giá bán phải từ 1.000đ trở lên.', 'error');
+        return;
+      }
+
+      if (!['true', 'false'].includes(availableInput.value)) {
+        e.preventDefault();
+        availableInput.classList.add('input-error');
+        showToast('Trạng thái còn bán không hợp lệ.', 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('.confirm-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      const message = form.dataset.confirm || 'Bạn chắc chắn muốn thực hiện thao tác này?';
+
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

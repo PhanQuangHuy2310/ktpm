@@ -1,0 +1,337 @@
+<%- include('partials/header') %>
+
+<section class="page-head">
+  <div>
+    <span class="eyebrow">Accounts</span>
+    <h1>Quản lý tài khoản nhân sự</h1>
+    <p>
+      Khách hàng tự đăng ký. Admin cấp tài khoản manager/staff;
+      manager chỉ cấp/sửa staff thuộc chi nhánh của mình.
+    </p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<form method="post" class="form-inline card" id="addUserForm">
+  <input
+    name="username"
+    placeholder="username"
+    required
+  >
+
+  <input
+    name="password"
+    value="1234567"
+    placeholder="Mật khẩu"
+    required
+  >
+
+  <input
+    name="full_name"
+    placeholder="Họ tên"
+    required
+  >
+
+  <select name="role" required>
+    <% if (user.role === 'admin') { %>
+      <option value="manager">manager</option>
+      <option value="staff">staff</option>
+      <option value="admin">admin</option>
+    <% } else { %>
+      <option value="staff">staff</option>
+    <% } %>
+  </select>
+
+  <select name="branch_id">
+    <option value="">Không</option>
+
+    <% branches.forEach(b => { %>
+      <option value="<%= b.id %>"><%= b.name %></option>
+    <% }) %>
+  </select>
+
+  <button type="submit">+ Thêm tài khoản</button>
+</form>
+
+<% if (!users || users.length === 0) { %>
+  <div class="card empty-state">
+    <h2>Chưa có tài khoản</h2>
+    <p class="muted">Danh sách tài khoản nhân sự sẽ hiển thị sau khi có dữ liệu.</p>
+  </div>
+<% } else { %>
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>Username</th>
+      <th>Họ tên</th>
+      <th>Quyền</th>
+      <th>Chi nhánh</th>
+      <th>Trạng thái</th>
+      <th>Thao tác</th>
+    </tr>
+
+    <% users.forEach(u => { %>
+      <tr>
+        <td>
+          <span class="badge">#<%= u.id %></span>
+        </td>
+
+        <td><%= u.username %></td>
+
+        <td>
+          <input
+            form="update-user-<%= u.id %>"
+            name="full_name"
+            value="<%= u.full_name %>"
+            required
+          >
+        </td>
+
+        <td>
+          <select form="update-user-<%= u.id %>" name="role" required>
+            <option value="staff" <%= u.role === 'staff' ? 'selected' : '' %>>staff</option>
+
+            <% if (user.role === 'admin') { %>
+              <option value="manager" <%= u.role === 'manager' ? 'selected' : '' %>>manager</option>
+              <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>admin</option>
+            <% } %>
+          </select>
+        </td>
+
+        <td>
+          <select form="update-user-<%= u.id %>" name="branch_id">
+            <option value="">Không</option>
+
+            <% branches.forEach(b => { %>
+              <option
+                value="<%= b.id %>"
+                <%= Number(u.branch_id) === b.id ? 'selected' : '' %>
+              >
+                <%= b.name %>
+              </option>
+            <% }) %>
+          </select>
+        </td>
+
+        <td>
+          <select form="update-user-<%= u.id %>" name="status" required>
+            <option value="ACTIVE" <%= u.status === 'ACTIVE' ? 'selected' : '' %>>ACTIVE</option>
+            <option value="INACTIVE" <%= u.status === 'INACTIVE' ? 'selected' : '' %>>INACTIVE</option>
+          </select>
+        </td>
+
+        <td class="actions-cell">
+          <input
+            form="update-user-<%= u.id %>"
+            name="password"
+            placeholder="Mật khẩu mới"
+          >
+
+          <form
+            id="update-user-<%= u.id %>"
+            method="post"
+            action="/users/<%= u.id %>/update"
+            class="validate-user-form"
+          >
+            <button type="submit">Lưu</button>
+          </form>
+
+          <% if (user.role === 'admin') { %>
+            <form
+              method="post"
+              action="/users/<%= u.id %>/delete"
+              class="confirm-form"
+              data-confirm="Bạn chắc chắn muốn khóa tài khoản này?"
+            >
+              <button type="submit" class="danger">Khóa</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+<% } %>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(function () {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function getFormInput(form, name) {
+    const inputInForm = form.querySelector('[name="' + name + '"]');
+
+    if (inputInForm) {
+      return inputInForm;
+    }
+
+    return document.querySelector('[form="' + form.id + '"][name="' + name + '"]');
+  }
+
+  function clearFormErrors(form) {
+    form.querySelectorAll('input, select, textarea').forEach(function (input) {
+      input.classList.remove('input-error');
+    });
+
+    if (form.id) {
+      document.querySelectorAll('[form="' + form.id + '"]').forEach(function (input) {
+        input.classList.remove('input-error');
+      });
+    }
+  }
+
+  function validateUsername(username) {
+    return /^[a-zA-Z0-9_]{3,30}$/.test(username);
+  }
+
+  function validateUserRole(role) {
+    return ['admin', 'manager', 'staff'].includes(role);
+  }
+
+  function validateUserStatus(status) {
+    return ['ACTIVE', 'INACTIVE'].includes(status);
+  }
+
+  const addUserForm = document.getElementById('addUserForm');
+
+  if (addUserForm) {
+    addUserForm.addEventListener('submit', function (e) {
+      clearFormErrors(addUserForm);
+
+      const usernameInput = addUserForm.querySelector('[name="username"]');
+      const passwordInput = addUserForm.querySelector('[name="password"]');
+      const fullNameInput = addUserForm.querySelector('[name="full_name"]');
+      const roleInput = addUserForm.querySelector('[name="role"]');
+      const branchInput = addUserForm.querySelector('[name="branch_id"]');
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      const fullName = fullNameInput.value.trim();
+      const role = roleInput.value.trim();
+      const branchId = branchInput ? branchInput.value.trim() : '';
+
+      if (!validateUsername(username)) {
+        e.preventDefault();
+        usernameInput.classList.add('input-error');
+        showToast('Username chỉ gồm chữ, số, dấu gạch dưới và dài 3-30 ký tự.', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        e.preventDefault();
+        passwordInput.classList.add('input-error');
+        showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
+        return;
+      }
+
+      if (fullName.length < 2) {
+        e.preventDefault();
+        fullNameInput.classList.add('input-error');
+        showToast('Họ tên phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (!validateUserRole(role)) {
+        e.preventDefault();
+        roleInput.classList.add('input-error');
+        showToast('Quyền tài khoản không hợp lệ.', 'error');
+        return;
+      }
+
+      if ((role === 'manager' || role === 'staff') && !branchId) {
+        e.preventDefault();
+        branchInput.classList.add('input-error');
+        showToast('Tài khoản manager/staff phải chọn chi nhánh.', 'error');
+      }
+    });
+  }
+
+  document.querySelectorAll('.validate-user-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      clearFormErrors(form);
+
+      const fullNameInput = getFormInput(form, 'full_name');
+      const roleInput = getFormInput(form, 'role');
+      const branchInput = getFormInput(form, 'branch_id');
+      const statusInput = getFormInput(form, 'status');
+      const passwordInput = getFormInput(form, 'password');
+
+      const fullName = fullNameInput.value.trim();
+      const role = roleInput.value.trim();
+      const branchId = branchInput ? branchInput.value.trim() : '';
+      const status = statusInput.value.trim();
+      const password = passwordInput ? passwordInput.value.trim() : '';
+
+      if (fullName.length < 2) {
+        e.preventDefault();
+        fullNameInput.classList.add('input-error');
+        showToast('Họ tên phải có ít nhất 2 ký tự.', 'error');
+        return;
+      }
+
+      if (!validateUserRole(role)) {
+        e.preventDefault();
+        roleInput.classList.add('input-error');
+        showToast('Quyền tài khoản không hợp lệ.', 'error');
+        return;
+      }
+
+      if ((role === 'manager' || role === 'staff') && !branchId) {
+        e.preventDefault();
+        branchInput.classList.add('input-error');
+        showToast('Tài khoản manager/staff phải chọn chi nhánh.', 'error');
+        return;
+      }
+
+      if (!validateUserStatus(status)) {
+        e.preventDefault();
+        statusInput.classList.add('input-error');
+        showToast('Trạng thái tài khoản không hợp lệ.', 'error');
+        return;
+      }
+
+      if (password && password.length < 6) {
+        e.preventDefault();
+        passwordInput.classList.add('input-error');
+        showToast('Mật khẩu mới phải có ít nhất 6 ký tự.', 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('.confirm-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      const message = form.dataset.confirm || 'Bạn chắc chắn muốn thực hiện thao tác này?';
+
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+</script>
+
+<%- include('partials/footer') %>

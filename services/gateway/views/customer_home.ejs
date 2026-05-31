@@ -1,0 +1,354 @@
+<%- include('partials/header') %>
+
+<section class="hero shop-hero">
+  <div>
+    <span class="eyebrow">Fresh coffee • Fast delivery</span>
+    <h1>Đặt cà phê online</h1>
+    <p>Chọn chi nhánh, chọn món, dùng điểm giảm giá và nhận hóa đơn sau thanh toán.</p>
+  </div>
+
+  <div class="point-card">
+    <b><%= customer.points %> điểm</b>
+    <span>Quy đổi được <%= Number(customer.points * 500).toLocaleString('vi-VN') %>đ</span>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+  <button type="button" onclick="closeToast()">×</button>
+</div>
+
+<% if (error) { %>
+  <div class="alert"><%= error %></div>
+<% } %>
+
+<form method="get" class="form-inline card toolbar">
+  <label>Chi nhánh</label>
+
+  <select name="branch_id" onchange="this.form.submit()">
+    <% branches.forEach(b => { %>
+      <option value="<%= b.id %>" <%= Number(branchId) === b.id ? 'selected' : '' %>>
+        <%= b.name %>
+      </option>
+    <% }) %>
+  </select>
+
+  <label>Danh mục</label>
+
+  <select name="category" onchange="this.form.submit()">
+    <option value="">Tất cả sản phẩm</option>
+
+    <% categories.forEach(c => { %>
+      <option value="<%= c %>" <%= category === c ? 'selected' : '' %>>
+        <%= c %>
+      </option>
+    <% }) %>
+  </select>
+</form>
+
+<section class="two">
+  <form
+    method="post"
+    action="/customer/order"
+    class="card order-panel"
+    id="orderForm"
+  >
+    <input type="hidden" name="branch_id" value="<%= branchId %>">
+
+    <h2>Sản phẩm</h2>
+
+    <div class="product-grid">
+      <% menu.forEach(m => { %>
+        <article class="product-card">
+          <img src="<%= m.image_url || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=500' %>">
+
+          <div class="product-info">
+            <span class="pill"><%= m.category %></span>
+
+            <h3><%= m.name %></h3>
+
+            <p><%= m.description || 'Món ngon tại chi nhánh' %></p>
+
+            <strong data-price="<%= m.price %>">
+              <%= Number(m.price).toLocaleString('vi-VN') %>đ
+            </strong>
+
+            <div class="buy-row">
+              <label>
+                <input
+                  class="choose"
+                  type="checkbox"
+                  name="menu_item_id"
+                  value="<%= m.menu_item_id %>"
+                >
+                Chọn
+              </label>
+
+              <input
+                class="qty"
+                type="number"
+                name="quantity_<%= m.menu_item_id %>"
+                value="1"
+                min="1"
+              >
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+
+    <h2>Giao hàng & điểm</h2>
+
+    <label>Địa chỉ giao hàng mặc định</label>
+
+    <div class="address-box">
+      <input
+        id="deliveryAddress"
+        name="delivery_address"
+        value="<%= customer.address || '' %>"
+        readonly
+        required
+      >
+
+      <button type="button" class="light" onclick="enableAddressEdit()">
+        Sửa địa chỉ
+      </button>
+    </div>
+
+    <label>Dùng điểm giảm giá</label>
+
+    <input
+      id="usePoints"
+      type="number"
+      name="use_points"
+      min="0"
+      max="<%= customer.points %>"
+      value="0"
+    >
+
+    <small>
+      Bạn có <b><%= customer.points %></b> điểm =
+      <b><%= Number(customer.points * 500).toLocaleString('vi-VN') %>đ</b>.
+      1 điểm = 500đ. Nếu nhập quá điểm, hệ thống sẽ báo không đủ điểm.
+    </small>
+
+    <textarea name="note" placeholder="Ghi chú cho cửa hàng"></textarea>
+
+    <button class="primary" type="submit">Xác nhận đặt hàng</button>
+  </form>
+
+  <aside class="card cart-card">
+    <h2>Tóm tắt đơn</h2>
+
+    <div id="cartItems" class="muted">Chưa chọn sản phẩm</div>
+
+    <hr>
+
+    <p>Tạm tính: <b id="subtotal">0đ</b></p>
+    <p>Giảm điểm: <b id="discount">0đ</b></p>
+    <p>Thanh toán: <b id="finalTotal">0đ</b></p>
+
+    <p class="muted">
+      Sau khi thanh toán thành công, hệ thống tự cộng điểm theo tỷ lệ
+      10.000đ = 1 điểm.
+    </p>
+  </aside>
+</section>
+
+<form method="post" action="/customer/address" class="card" id="addressForm">
+  <h2>Cập nhật địa chỉ giao hàng mặc định</h2>
+
+  <input
+    name="address"
+    id="defaultAddress"
+    value="<%= customer.address || '' %>"
+    required
+  >
+
+  <button type="submit">Lưu địa chỉ</button>
+</form>
+
+<script>
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+
+  function showToast(message, type = 'success') {
+    toast.className = `toast ${type}`;
+    toastMessage.textContent = message;
+
+    setTimeout(() => {
+      closeToast();
+    }, 3500);
+  }
+
+  function closeToast() {
+    toast.className = 'toast hidden';
+  }
+
+  function money(n) {
+    return Number(n || 0).toLocaleString('vi-VN') + 'đ';
+  }
+
+  function enableAddressEdit() {
+    const input = document.getElementById('deliveryAddress');
+    input.removeAttribute('readonly');
+    input.focus();
+  }
+
+  function getSelectedItems() {
+    const selectedItems = [];
+
+    document.querySelectorAll('.product-card').forEach(card => {
+      const checkbox = card.querySelector('.choose');
+      const quantityInput = card.querySelector('.qty');
+      const priceElement = card.querySelector('[data-price]');
+      const nameElement = card.querySelector('h3');
+
+      const quantity = Number(quantityInput.value || 1);
+      const price = Number(priceElement.dataset.price || 0);
+      const name = nameElement.textContent.trim();
+
+      if (checkbox.checked) {
+        selectedItems.push({
+          name,
+          quantity,
+          price,
+          quantityInput
+        });
+      }
+    });
+
+    return selectedItems;
+  }
+
+  function calc() {
+    let subtotal = 0;
+    const items = [];
+
+    const selectedItems = getSelectedItems();
+
+    selectedItems.forEach(item => {
+      subtotal += item.price * item.quantity;
+      items.push(`${item.name} x ${item.quantity}`);
+    });
+
+    const usePointsInput = document.getElementById('usePoints');
+    const points = Number(usePointsInput.value || 0);
+    const maxPoints = Number(usePointsInput.max || 0);
+
+    if (points > maxPoints) {
+      usePointsInput.setCustomValidity('Điểm không đủ');
+    } else {
+      usePointsInput.setCustomValidity('');
+    }
+
+    const discount = points * 500;
+    const finalTotal = Math.max(0, subtotal - discount);
+
+    document.getElementById('cartItems').innerHTML = items.length
+      ? items.map(item => '<div>' + item + '</div>').join('')
+      : 'Chưa chọn sản phẩm';
+
+    document.getElementById('subtotal').textContent = money(subtotal);
+    document.getElementById('discount').textContent = money(discount);
+    document.getElementById('finalTotal').textContent = money(finalTotal);
+  }
+
+  document.querySelectorAll('.choose, .qty, #usePoints').forEach(element => {
+    element.addEventListener('input', calc);
+    element.addEventListener('change', calc);
+  });
+
+  const orderForm = document.getElementById('orderForm');
+
+  orderForm.addEventListener('submit', function (e) {
+    const selectedItems = getSelectedItems();
+    const deliveryAddress = document.getElementById('deliveryAddress');
+    const usePointsInput = document.getElementById('usePoints');
+
+    const points = Number(usePointsInput.value || 0);
+    const maxPoints = Number(usePointsInput.max || 0);
+
+    document.querySelectorAll('.input-error').forEach(input => {
+      input.classList.remove('input-error');
+    });
+
+    if (selectedItems.length === 0) {
+      e.preventDefault();
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm.', 'error');
+      return;
+    }
+
+    for (const item of selectedItems) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        e.preventDefault();
+        item.quantityInput.classList.add('input-error');
+        showToast('Số lượng sản phẩm phải lớn hơn 0.', 'error');
+        return;
+      }
+    }
+
+    if (!deliveryAddress.value.trim()) {
+      e.preventDefault();
+      deliveryAddress.classList.add('input-error');
+      showToast('Vui lòng nhập địa chỉ giao hàng.', 'error');
+      return;
+    }
+
+    if (deliveryAddress.value.trim().length < 5) {
+      e.preventDefault();
+      deliveryAddress.classList.add('input-error');
+      showToast('Địa chỉ giao hàng phải có ít nhất 5 ký tự.', 'error');
+      return;
+    }
+
+    if (points < 0) {
+      e.preventDefault();
+      usePointsInput.classList.add('input-error');
+      showToast('Số điểm sử dụng không được nhỏ hơn 0.', 'error');
+      return;
+    }
+
+    if (points > maxPoints) {
+      e.preventDefault();
+      usePointsInput.classList.add('input-error');
+      showToast('Bạn không đủ điểm để sử dụng.', 'error');
+      return;
+    }
+  });
+
+  const addressForm = document.getElementById('addressForm');
+
+  addressForm.addEventListener('submit', function (e) {
+    const defaultAddress = document.getElementById('defaultAddress');
+
+    defaultAddress.classList.remove('input-error');
+
+    if (!defaultAddress.value.trim()) {
+      e.preventDefault();
+      defaultAddress.classList.add('input-error');
+      showToast('Địa chỉ mặc định không được để trống.', 'error');
+      return;
+    }
+
+    if (defaultAddress.value.trim().length < 5) {
+      e.preventDefault();
+      defaultAddress.classList.add('input-error');
+      showToast('Địa chỉ mặc định phải có ít nhất 5 ký tự.', 'error');
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('success')) {
+    showToast(params.get('success'), 'success');
+  }
+
+  if (params.get('error')) {
+    showToast(params.get('error'), 'error');
+  }
+
+  calc();
+</script>
+
+<%- include('partials/footer') %>
